@@ -14,65 +14,57 @@ const chartData = [
   { name: "Sun", value: 350 },
 ];
 
+const STAT_CARDS = [
+  { label: "Followers", value: "12.4k", change: "+3.8% this week", icon: Users, gradient: "from-blue-500 to-blue-700", tint: "text-blue-100" },
+  { label: "Engagement", value: "8.2%", change: "+1.1% this week", icon: BarChart3, gradient: "from-purple-500 to-purple-700", tint: "text-purple-100" },
+  { label: "Posts", value: "482", change: "+14 new this week", icon: PlusCircle, gradient: "from-green-500 to-green-700", tint: "text-green-100" },
+  { label: "Scheduled", value: "24", change: "2 upcoming today", icon: Calendar, gradient: "from-orange-500 to-orange-700", tint: "text-orange-100" },
+];
+
 export default function DashboardPage() {
   return (
-    <div className="p-6 space-y-6">
+    <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
 
       <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold">Dashboard</h1>
-        <Bell className="w-6 h-6 text-gray-600 dark:text-gray-300 cursor-pointer" />
+        <h1 className="text-3xl font-semibold text-gray-900">Dashboard</h1>
+        <Bell className="w-6 h-6 text-gray-500 hover:text-gray-700 cursor-pointer transition-colors" />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-
-        <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg rounded-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium">Followers</h2>
-            <Users className="w-7 h-7 opacity-80" />
-          </div>
-          <p className="text-4xl font-bold mt-3">12.4k</p>
-          <p className="text-sm mt-1 text-blue-100">+3.8% this week</p>
-        </Card>
-
-        <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg rounded-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium">Engagement</h2>
-            <BarChart3 className="w-7 h-7 opacity-80" />
-          </div>
-          <p className="text-4xl font-bold mt-3">8.2%</p>
-          <p className="text-sm mt-1 text-purple-100">+1.1% this week</p>
-        </Card>
-
-        <Card className="p-6 bg-gradient-to-br from-green-500 to-green-700 text-white shadow-lg rounded-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium">Posts</h2>
-            <PlusCircle className="w-7 h-7 opacity-80" />
-          </div>
-          <p className="text-4xl font-bold mt-3">482</p>
-          <p className="text-sm mt-1 text-green-100">+14 new this week</p>
-        </Card>
-
-        <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg rounded-xl">
-          <div className="flex items-center justify-between">
-            <h2 className="text-lg font-medium">Scheduled</h2>
-            <Calendar className="w-7 h-7 opacity-80" />
-          </div>
-          <p className="text-4xl font-bold mt-3">24</p>
-          <p className="text-sm mt-1 text-orange-100">2 upcoming today</p>
-        </Card>
-
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        {STAT_CARDS.map(({ label, value, change, icon: Icon, gradient, tint }) => (
+          <Card
+            key={label}
+            className={`p-6 bg-gradient-to-br ${gradient} text-white shadow-sm rounded-xl border-0 flex flex-col justify-between min-h-[152px]`}
+          >
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-medium text-white/90">{label}</h2>
+              <Icon className="w-6 h-6 opacity-80" />
+            </div>
+            <div className="space-y-1">
+              <p className="text-3xl font-bold leading-none">{value}</p>
+              <p className={`text-sm ${tint}`}>{change}</p>
+            </div>
+          </Card>
+        ))}
       </div>
 
-      <Card className="p-6 shadow rounded-xl dark:bg-neutral-900">
-        <h2 className="text-xl font-semibold mb-4">Weekly Performance</h2>
+      <Card className="p-6 shadow-sm rounded-xl dark:bg-neutral-900">
+        <h2 className="text-lg font-semibold mb-6 text-gray-900 dark:text-white">Weekly Performance</h2>
 
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} />
+        <ResponsiveContainer width="100%" height={320}>
+          <LineChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+            <XAxis dataKey="name" stroke="#9ca3af" fontSize={13} tickLine={false} axisLine={false} />
+            <YAxis stroke="#9ca3af" fontSize={13} tickLine={false} axisLine={false} />
+            <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e7eb" }} />
+            <Line
+              type="monotone"
+              dataKey="value"
+              stroke="#3b82f6"
+              strokeWidth={3}
+              dot={{ r: 4, fill: "#3b82f6", strokeWidth: 0 }}
+              activeDot={{ r: 6 }}
+            />
           </LineChart>
         </ResponsiveContainer>
       </Card>
