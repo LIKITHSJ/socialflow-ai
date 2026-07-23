@@ -25,6 +25,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="flex">
+        {/* MOBILE SIDEBAR OVERLAY */}
         {open && (
           <div
             className="fixed inset-0 bg-black bg-opacity-40 z-40 lg:hidden"
@@ -39,6 +40,7 @@ export default function RootLayout({
           <Sidebar />
         </div>
         <div className="flex-1 flex flex-col min-h-screen ml-0 lg:ml-64">
+          {/* NAVBAR */}
           <div className="flex items-center justify-between bg-white shadow px-6 h-16">
             <button
               className="text-3xl lg:hidden"
