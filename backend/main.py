@@ -6,11 +6,10 @@ Run locally with:
 """
 
 import os
-from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
-
-from routers.ai_suggestions import router as ai_router
+from auth_utils import get_current_user
+from fastapi import FastAPI, Depends
 from routers.ai_suggestions import router as ai_router
 from routers.auth import router as auth_router
 load_dotenv()
@@ -37,9 +36,10 @@ def root():
 def health():
     return {"status": "healthy"}
 
+@app.get("/auth/me")
+def get_me(user = Depends(get_current_user)):
+    return {"id": user.id, "email": user.email}
 
-
-app.include_router(ai_router)
 app.include_router(ai_router)
 app.include_router(auth_router)
 
