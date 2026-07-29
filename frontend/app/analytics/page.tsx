@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import {
   LineChart,
@@ -11,19 +11,67 @@ import {
   Tooltip,
   CartesianGrid,
 } from "recharts";
+import { useAuth } from "@/lib/authContext";
+import {
+  AnalyticsSnapshot,
+  toChartData,
+  computeStatCards,
+} from "@/lib/mockAnalytics";
 
-const chartData = [
-  { name: "Mon", value: 320 },
-  { name: "Tue", value: 500 },
-  { name: "Wed", value: 420 },
-  { name: "Thu", value: 610 },
-  { name: "Fri", value: 750 },
-  { name: "Sat", value: 830 },
-  { name: "Sun", value: 910 },
-];
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function AnalyticsPage() {
   const [selectedRange, setSelectedRange] = useState("7d");
+  const { token } = useAuth();
+
+  const [snapshots, setSnapshots] = useState<AnalyticsSnapshot[] | null>(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const rangeDays: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90, "1y": 90 };
+    const days = rangeDays[selectedRange] ?? 7;
+
+    async function loadAnalytics() {
+      setLoading(true);
+      setError("");
+      try {
+        const connRes = await fetch(`${API_BASE}/platform-connections`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!connRes.ok) throw new Error("Failed to load platform connections");
+        const connections = await connRes.json();
+
+        if (!connections.length) {
+          setError("No connected accounts yet. Connect a platform to see analytics.");
+          setSnapshots(null);
+          return;
+        }
+
+        const connectionId = connections[0].id;
+
+        const snapRes = await fetch(
+          `${API_BASE}/analytics/${connectionId}?days=${days}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!snapRes.ok) throw new Error("Failed to load analytics data");
+        const data: AnalyticsSnapshot[] = await snapRes.json();
+        setSnapshots(data);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Something went wrong");
+        setSnapshots(null);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadAnalytics();
+  }, [token, selectedRange]);
+
+  const stats = snapshots && snapshots.length > 0 ? computeStatCards(snapshots) : null;
+  const chartData = snapshots && snapshots.length > 0 ? toChartData(snapshots) : [];
 
   return (
     <div className="p-6 space-y-6">
@@ -45,62 +93,53 @@ export default function AnalyticsPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg rounded-xl">
-          <p className="text-sm opacity-80">Total Reach</p>
-          <h2 className="text-4xl font-bold mt-2">123,400</h2>
-          <p className="text-sm mt-1">+18.2% this week</p>
-        </Card>
+      {loading && <p className="text-gray-500">Loading analytics...</p>}
+      {error && !loading && (
+        <div className="p-4 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
+      )}
 
-        <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg rounded-xl">
-          <p className="text-sm opacity-80">Engagement</p>
-          <h2 className="text-4xl font-bold mt-2">9,530</h2>
-          <p className="text-sm mt-1">+4.7% this week</p>
-        </Card>
+      {!loading && !error && stats && (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <Card className="p-6 bg-gradient-to-br from-blue-500 to-blue-700 text-white shadow-lg rounded-xl">
+              <p className="text-sm opacity-80">Followers</p>
+              <h2 className="text-4xl font-bold mt-2">{stats.followers.value}</h2>
+              <p className="text-sm mt-1">{stats.followers.change}</p>
+            </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-green-500 to-green-700 text-white shadow-lg rounded-xl">
-          <p className="text-sm opacity-80">Profile Visits</p>
-          <h2 className="text-4xl font-bold mt-2">22,890</h2>
-          <p className="text-sm mt-1">-3.2% this week</p>
-        </Card>
+            <Card className="p-6 bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-lg rounded-xl">
+              <p className="text-sm opacity-80">Engagement</p>
+              <h2 className="text-4xl font-bold mt-2">{stats.engagement.value}</h2>
+              <p className="text-sm mt-1">{stats.engagement.change}</p>
+            </Card>
 
-        <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg rounded-xl">
-          <p className="text-sm opacity-80">Followers</p>
-          <h2 className="text-4xl font-bold mt-2">1,240</h2>
-          <p className="text-sm mt-1">+120 this week</p>
-        </Card>
-      </div>
+            <Card className="p-6 bg-gradient-to-br from-green-500 to-green-700 text-white shadow-lg rounded-xl">
+              <p className="text-sm opacity-80">Total Posts</p>
+              <h2 className="text-4xl font-bold mt-2">{stats.posts.value}</h2>
+              <p className="text-sm mt-1">{stats.posts.change}</p>
+            </Card>
 
-      <Card className="p-6 shadow rounded-xl dark:bg-neutral-900">
-        <h2 className="text-xl font-semibold mb-4">Engagement Trend</h2>
+            <Card className="p-6 bg-gradient-to-br from-orange-500 to-orange-700 text-white shadow-lg rounded-xl">
+              <p className="text-sm opacity-80">Scheduled</p>
+              <h2 className="text-4xl font-bold mt-2">{stats.scheduled.value}</h2>
+              <p className="text-sm mt-1">{stats.scheduled.change}</p>
+            </Card>
+          </div>
 
-        <ResponsiveContainer width="100%" height={300}>
-          <LineChart data={chartData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip />
-            <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} />
-          </LineChart>
-        </ResponsiveContainer>
-      </Card>
-
-      <Card className="p-6 shadow rounded-xl dark:bg-neutral-900">
-        <h2 className="text-xl font-semibold mb-4">Top Performing Posts</h2>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((post) => (
-            <div
-              key={post}
-              className="p-4 bg-neutral-100 dark:bg-neutral-800 rounded-lg hover:scale-[1.02] transition shadow"
-            >
-              <div className="w-full h-40 bg-gray-300 dark:bg-neutral-700 rounded mb-3"></div>
-              <p className="font-medium">Post #{post} — 12.4k views</p>
-              <p className="text-sm text-gray-500">1.2k likes · 250 comments</p>
-            </div>
-          ))}
-        </div>
-      </Card>
+          <Card className="p-6 shadow rounded-xl dark:bg-neutral-900">
+            <h2 className="text-xl font-semibold mb-4">Followers Trend</h2>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#ddd" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip />
+                <Line type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={3} />
+              </LineChart>
+            </ResponsiveContainer>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

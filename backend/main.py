@@ -13,6 +13,8 @@ from fastapi import FastAPI, Depends
 from routers.ai_suggestions import router as ai_router
 from routers.auth import router as auth_router
 from routers.auto_reply import router as auto_reply_router
+from routers.analytics import router as analytics_router
+from routers.platform_connections import router as platform_connections_router
 load_dotenv()
 
 app = FastAPI(title="SocialFlow AI API", version="0.1.0")
@@ -44,6 +46,8 @@ def get_me(user = Depends(get_current_user)):
 app.include_router(ai_router)
 app.include_router(auth_router)
 app.include_router(auto_reply_router)
+app.include_router(analytics_router)
+app.include_router(platform_connections_router)
 
 # Routers for posts, social_accounts, ai_generations, etc. get included
 # here as the project grows, e.g.:
