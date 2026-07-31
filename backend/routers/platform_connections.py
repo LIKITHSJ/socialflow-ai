@@ -1,4 +1,5 @@
 import os
+import secrets
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import RedirectResponse
@@ -17,12 +18,16 @@ YOUTUBE_SCOPES = [
     "https://www.googleapis.com/auth/userinfo.profile",
 ]
 
-# In-memory store mapping state -> code_verifier for the brief window
-# between /connect/youtube and /callback/youtube. PKCE requires the same
-# code_verifier used to build the authorization URL to also be used when
-# exchanging the code for tokens — but each request creates a fresh Flow
-# object, so it must be persisted manually across the two requests.
-_pkce_store: dict[str, str] = {}
+# In-memory store mapping a random state -> {code_verifier, user_id} for
+# the brief window between /connect/youtube and /callback/youtube.
+# PKCE requires the same code_verifier used to build the authorization
+# URL to also be used when exchanging the code for tokens — but each
+# request creates a fresh Flow object, so it must be persisted manually.
+# `state` is a random, unguessable token (not the user_id) for CSRF safety.
+# NOTE: in-memory only — fine for local dev, won't survive multiple
+# worker processes or restarts. Swap for Redis or a short-TTL DB table
+# before deploying for real.
+_pkce_store: dict[str, dict] = {}
 
 
 def _build_youtube_flow() -> Flow:
@@ -75,22 +80,25 @@ def connect_youtube(token: str):
     """
     Starts the YouTube OAuth flow. Triggered by a full-page browser
     redirect, so auth is passed as a query param (?token=...) instead
-    of a header, and verified manually. The user's id is then carried
-    through `state` so the callback knows who's connecting.
+    of a header, and verified manually. A random, unguessable `state`
+    is generated for CSRF protection — the code_verifier and user_id
+    are stored together, keyed by that state, for the callback to use.
     """
     user = _verify_token_query_param(token)
 
     flow = _build_youtube_flow()
-    auth_url, state = flow.authorization_url(
+    random_state = secrets.token_urlsafe(32)
+    auth_url, _ = flow.authorization_url(
         access_type="offline",       # needed to get a refresh_token
         include_granted_scopes="true",
         prompt="consent",            # forces refresh_token on repeat connects
-        state=user.id,
+        state=random_state,
     )
 
-    # Persist this Flow's code_verifier so /callback/youtube can reuse it
-    # for the token exchange (PKCE requires the same verifier on both ends).
-    _pkce_store[state] = flow.code_verifier
+    _pkce_store[random_state] = {
+        "code_verifier": flow.code_verifier,
+        "user_id": user.id,
+    }
 
     return RedirectResponse(auth_url)
 
@@ -99,17 +107,19 @@ def connect_youtube(token: str):
 def youtube_callback(code: str, state: str):
     """
     Google redirects here after the user approves access.
-    `state` carries back the user_id we passed in `/connect/youtube`.
+    `state` is the random token generated in /connect/youtube — used
+    to look up the matching code_verifier and user_id.
     Exchanges the code for tokens and stores the connection.
     """
-    user_id = state
-
-    code_verifier = _pkce_store.pop(state, None)
-    if not code_verifier:
+    entry = _pkce_store.pop(state, None)
+    if not entry:
         raise HTTPException(
             status_code=400,
             detail="OAuth session expired or invalid — please try connecting again.",
         )
+
+    user_id = entry["user_id"]
+    code_verifier = entry["code_verifier"]
 
     flow = _build_youtube_flow()
     flow.code_verifier = code_verifier
