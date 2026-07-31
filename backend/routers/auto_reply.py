@@ -61,8 +61,11 @@ def update_config(
 
     update_data = {k: v for k, v in payload.model_dump(exclude_unset=True).items()}
     if "custom_rules" in update_data and update_data["custom_rules"] is not None:
+        # Always validate through CustomRule so field defaults (e.g. enabled=True)
+        # are applied consistently, even if the caller's dict omitted them.
         update_data["custom_rules"] = [
-            r if isinstance(r, dict) else r.model_dump() for r in update_data["custom_rules"]
+            (r if isinstance(r, CustomRule) else CustomRule(**r)).model_dump()
+            for r in update_data["custom_rules"]
         ]
 
     if not update_data:
