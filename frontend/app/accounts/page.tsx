@@ -30,7 +30,7 @@ const PLATFORMS: PlatformDef[] = [
     color: "from-pink-500 to-pink-600",
     icon: <Instagram className="w-12 h-12" />,
     buttonColor: "bg-pink-600 hover:bg-pink-700",
-    available: false,
+    available: true,
   },
   {
     key: "youtube",
@@ -46,7 +46,7 @@ const PLATFORMS: PlatformDef[] = [
     color: "from-gray-900 to-gray-700",
     icon: <Twitter className="w-12 h-12" />,
     buttonColor: "bg-black hover:bg-gray-900",
-    available: false,
+    available: true,
   },
 ];
 
@@ -80,22 +80,8 @@ export default function AccountsPage() {
   const getConnection = (key: string) => connections.find((c) => c.platform === key);
 
   const handleConnect = (key: string) => {
-    if (key !== "youtube") return;
-
-    // KNOWN BLOCKER: /platform-connections/connect/youtube requires an
-    // Authorization header via get_current_user, but this is a full-page
-    // redirect (window.location) — headers can't be attached to it.
-    // Needs Likhith to accept the token as a query param (or a short-lived
-    // signed state token) before this can actually work.
-    console.warn(
-      "[SocialFlow] Cannot redirect to /connect/youtube with auth header — backend needs token as query param. Flag to Likhith."
-    );
-    alert(
-      "YouTube connect is blocked: the backend needs to accept the auth token as a query param for the redirect to work. Ask Likhith to update /platform-connections/connect/youtube."
-    );
-
-    // Once fixed:
-    // window.location.href = `${API_BASE}/platform-connections/connect/youtube?token=${token}`;
+    if (!token) return;
+    window.location.href = `${API_BASE}/platform-connections/connect/${key}?token=${token}`;
   };
 
   return (
