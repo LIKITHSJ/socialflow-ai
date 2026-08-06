@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Card } from "@/components/ui/card";
 import {
   LineChart,
@@ -28,50 +28,51 @@ export default function AnalyticsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadAnalytics = useCallback(async () => {
     if (!token) return;
 
     const rangeDays: Record<string, number> = { "7d": 7, "30d": 30, "90d": 90, "1y": 90 };
     const days = rangeDays[selectedRange] ?? 7;
 
-    async function loadAnalytics() {
-      setLoading(true);
-      setError("");
-      try {
-        const connRes = await fetch(`${API_BASE}/platform-connections`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!connRes.ok) throw new Error("Failed to load platform connections");
-        const connections = await connRes.json();
+    setLoading(true);
+    setError("");
+    try {
+      const connRes = await fetch(`${API_BASE}/platform-connections`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!connRes.ok) throw new Error("Failed to load platform connections");
+      const connections = await connRes.json();
 
-        if (!connections.length) {
-          setError("No connected accounts yet. Connect a platform to see analytics.");
-          setSnapshots(null);
-          return;
-        }
-
-        const connectionId = connections[0].id;
-
-        const snapRes = await fetch(
-          `${API_BASE}/analytics/${connectionId}?days=${days}`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!snapRes.ok) throw new Error("Failed to load analytics data");
-        const data: AnalyticsSnapshot[] = await snapRes.json();
-        setSnapshots(data);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Something went wrong");
+      if (!connections.length) {
+        setError("No connected accounts yet. Connect a platform to see analytics.");
         setSnapshots(null);
-      } finally {
-        setLoading(false);
+        return;
       }
-    }
 
-    loadAnalytics();
+      const connectionId = connections[0].id;
+
+      const snapRes = await fetch(
+        `${API_BASE}/analytics/${connectionId}?days=${days}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!snapRes.ok) throw new Error("Failed to load analytics data");
+      const data: AnalyticsSnapshot[] = await snapRes.json();
+      setSnapshots(data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Something went wrong");
+      setSnapshots(null);
+    } finally {
+      setLoading(false);
+    }
   }, [token, selectedRange]);
+
+  useEffect(() => {
+    loadAnalytics();
+  }, [loadAnalytics]);
 
   const stats = snapshots && snapshots.length > 0 ? computeStatCards(snapshots) : null;
   const chartData = snapshots && snapshots.length > 0 ? toChartData(snapshots) : [];
+  const hasNoData = !loading && !error && snapshots !== null && snapshots.length === 0;
 
   return (
     <div className="p-6 space-y-6">
@@ -94,8 +95,28 @@ export default function AnalyticsPage() {
       </div>
 
       {loading && <p className="text-gray-500">Loading analytics...</p>}
+
       {error && !loading && (
-        <div className="p-4 bg-red-50 text-red-600 rounded-lg text-sm">{error}</div>
+        <div className="p-4 bg-red-50 text-red-600 rounded-lg text-sm flex items-center justify-between gap-4">
+          <span>{error}</span>
+          <button
+            onClick={loadAnalytics}
+            className="text-red-700 underline font-medium whitespace-nowrap"
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
+      {hasNoData && (
+        <div className="p-6 bg-white dark:bg-neutral-900 border border-dashed border-gray-300 dark:border-neutral-700 rounded-xl text-center">
+          <p className="text-gray-500 text-sm">
+            No analytics data yet for this account and range.
+          </p>
+          <p className="text-gray-400 text-xs mt-1">
+            Data will appear here once snapshots are recorded.
+          </p>
+        </div>
       )}
 
       {!loading && !error && stats && (
