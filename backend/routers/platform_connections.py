@@ -1,5 +1,7 @@
 import os
 import secrets
+import base64
+import hashlib
 os.environ.setdefault("OAUTHLIB_RELAX_TOKEN_SCOPE", "1")
 from datetime import datetime, timedelta, timezone
 import httpx
@@ -274,3 +276,121 @@ def instagram_callback(code: str, state: str):
     ).execute()
 
     return {"message": f"Instagram account '@{username}' connected successfully."}
+
+TWITTER_CLIENT_ID = os.environ["TWITTER_CLIENT_ID"]
+TWITTER_CLIENT_SECRET = os.environ["TWITTER_CLIENT_SECRET"]
+TWITTER_REDIRECT_URI = os.environ["TWITTER_REDIRECT_URI"]
+TWITTER_SCOPES = "tweet.read tweet.write users.read offline.access"
+
+
+def _generate_pkce_pair():
+    """Generates a PKCE code_verifier and its code_challenge (S256)."""
+    code_verifier = secrets.token_urlsafe(64)
+    digest = hashlib.sha256(code_verifier.encode("utf-8")).digest()
+    code_challenge = base64.urlsafe_b64encode(digest).decode("utf-8").rstrip("=")
+    return code_verifier, code_challenge
+
+
+@router.get("/connect/twitter")
+def connect_twitter(token: str):
+    """
+    Starts the Twitter/X OAuth 2.0 flow (PKCE required). Auth passed as
+    a query param since this is a full-page redirect, same pattern as
+    YouTube/Instagram.
+    """
+    user = _verify_token_query_param(token)
+
+    code_verifier, code_challenge = _generate_pkce_pair()
+    random_state = secrets.token_urlsafe(32)
+
+    _pkce_store[random_state] = {
+        "user_id": user.id,
+        "code_verifier": code_verifier,
+    }
+
+    auth_url = (
+        "https://twitter.com/i/oauth2/authorize"
+        f"?response_type=code"
+        f"&client_id={TWITTER_CLIENT_ID}"
+        f"&redirect_uri={TWITTER_REDIRECT_URI}"
+        f"&scope={TWITTER_SCOPES.replace(' ', '%20')}"
+        f"&state={random_state}"
+        f"&code_challenge={code_challenge}"
+        f"&code_challenge_method=S256"
+    )
+    return RedirectResponse(auth_url)
+
+
+@router.get("/callback/twitter")
+def twitter_callback(code: str, state: str):
+    """
+    Twitter redirects here after the user approves access. Exchanges
+    the code for tokens using PKCE, fetches the connected account's
+    username, and stores the connection.
+    """
+    entry = _pkce_store.pop(state, None)
+    if not entry:
+        raise HTTPException(
+            status_code=400,
+            detail="OAuth session expired or invalid — please try connecting again.",
+        )
+    user_id = entry["user_id"]
+    code_verifier = entry["code_verifier"]
+
+    # Twitter requires Basic Auth (client_id:client_secret) for confidential clients
+    basic_auth = base64.b64encode(
+        f"{TWITTER_CLIENT_ID}:{TWITTER_CLIENT_SECRET}".encode("utf-8")
+    ).decode("utf-8")
+
+    token_response = httpx.post(
+        "https://api.twitter.com/2/oauth2/token",
+        headers={
+            "Authorization": f"Basic {basic_auth}",
+            "Content-Type": "application/x-www-form-urlencoded",
+        },
+        data={
+            "grant_type": "authorization_code",
+            "code": code,
+            "redirect_uri": TWITTER_REDIRECT_URI,
+            "code_verifier": code_verifier,
+        },
+    )
+    if token_response.status_code != 200:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Twitter token exchange failed: {token_response.text}",
+        )
+    token_data = token_response.json()
+    access_token = token_data["access_token"]
+    refresh_token = token_data.get("refresh_token")
+    expires_in_seconds = token_data.get("expires_in", 7200)
+
+    # Fetch the connected account's username
+    profile_response = httpx.get(
+        "https://api.twitter.com/2/users/me",
+        headers={"Authorization": f"Bearer {access_token}"},
+    )
+    username = "Unknown Account"
+    twitter_user_id = None
+    if profile_response.status_code == 200:
+        profile_data = profile_response.json().get("data", {})
+        username = profile_data.get("username", "Unknown Account")
+        twitter_user_id = profile_data.get("id")
+
+    expires_at = datetime.now(timezone.utc) + timedelta(seconds=expires_in_seconds)
+
+    supabase_admin.table("platform_connections").upsert(
+        {
+            "user_id": user_id,
+            "platform": "twitter",
+            "platform_user_id": twitter_user_id,
+            "platform_username": username,
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "token_expires_at": expires_at.isoformat(),
+            "is_active": True,
+        },
+        on_conflict="user_id,platform",
+    ).execute()
+
+    return {"message": f"Twitter account '@{username}' connected successfully."}
