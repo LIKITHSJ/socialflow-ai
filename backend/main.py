@@ -16,7 +16,7 @@ from routers.auto_reply import router as auto_reply_router
 from routers.analytics import router as analytics_router
 from routers.platform_connections import router as platform_connections_router
 load_dotenv()
-
+from routers.posts import router as posts_router
 app = FastAPI(title="SocialFlow AI API", version="0.1.0")
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
@@ -48,7 +48,7 @@ app.include_router(auth_router)
 app.include_router(auto_reply_router)
 app.include_router(analytics_router)
 app.include_router(platform_connections_router)
-
+app.include_router(posts_router)
 # Routers for posts, social_accounts, ai_generations, etc. get included
 # here as the project grows, e.g.:
 # from routers import posts
