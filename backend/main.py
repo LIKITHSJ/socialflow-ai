@@ -17,6 +17,8 @@ from routers.analytics import router as analytics_router
 from routers.platform_connections import router as platform_connections_router
 load_dotenv()
 from routers.posts import router as posts_router
+import asyncio
+from services.scheduler_service import run_scheduler_loop
 app = FastAPI(title="SocialFlow AI API", version="0.1.0")
 
 FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
@@ -42,6 +44,10 @@ def health():
 @app.get("/auth/me")
 def get_me(user = Depends(get_current_user)):
     return {"id": user.id, "email": user.email}
+
+@app.on_event("startup")
+async def start_scheduler():
+    asyncio.create_task(run_scheduler_loop())
 
 app.include_router(ai_router)
 app.include_router(auth_router)
