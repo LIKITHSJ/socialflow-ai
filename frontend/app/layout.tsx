@@ -2,7 +2,7 @@
 import "./globals.css";
 import { usePathname } from "next/navigation";
 import Navbar from "./components/ui/Navbar";
-import Sidebar from "./components/ui/Sidebar";
+import Sidebar from "@/components/ui/sidebar";
 import { AuthProvider } from "@/lib/authContext";
 
 export default function RootLayout({

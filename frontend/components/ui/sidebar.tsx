@@ -24,8 +24,8 @@ const menuItems = [
   { name: "Accounts", href: "/accounts", icon: <LinkIcon /> },
   { name: "Team", href: "/team", icon: <UserCheck /> },
   { name: "Settings", href: "/settings", icon: <Settings /> },
-  { name: "Login", href: "/login", icon: <LogIn /> },
-  { name: "Signup", href: "/signup", icon: <UserPlus /> }
+  { name: "Login", href: "/auth/login", icon: <LogIn /> },
+  { name: "Signup", href: "/auth/register", icon: <UserPlus /> }
 ];
 export default function Sidebar() {
   const pathname = usePathname();
