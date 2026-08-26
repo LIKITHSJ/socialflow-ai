@@ -10,17 +10,9 @@ distro==1.9.0
 dnspython==2.8.0
 email-validator==2.3.0
 fastapi==0.115.0
-google-ai-generativelanguage==0.6.10
-google-api-core==2.32.0
-google-api-python-client==2.198.0
 google-auth==2.56.0
-google-auth-httplib2==0.4.0
 google-auth-oauthlib==1.4.0
-google-generativeai==0.8.3
-googleapis-common-protos==1.75.0
 gotrue==2.12.4
-grpcio==1.82.1
-grpcio-status==1.71.2
 h11==0.16.0
 h2==4.3.0
 hpack==4.2.0
@@ -32,8 +24,6 @@ idna==3.18
 oauthlib==3.3.1
 packaging==26.2
 postgrest==0.17.2
-proto-plus==1.28.1
-protobuf==5.29.6
 pyasn1==0.6.4
 pyasn1_modules==0.4.2
 pycparser==3.0
